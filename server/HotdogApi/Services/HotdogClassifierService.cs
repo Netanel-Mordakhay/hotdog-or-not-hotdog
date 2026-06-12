@@ -1,6 +1,8 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using SkiaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 public class HotdogClassifierService
 {
@@ -28,11 +30,10 @@ public class HotdogClassifierService
         using var stream = file.OpenReadStream();
 
         // Decode the uploaded image from the raw stream.
-        using var original = SKBitmap.Decode(stream);
+        using var image = Image.Load<Rgb24>(stream);
 
         // ResNet was trained on 224x224 images — any other size produces wrong results.
-        // SKBitmap.Resize returns a new bitmap; the original is unaffected.
-        using var resized = original.Resize(new SKImageInfo(224, 224), new SKSamplingOptions(SKCubicResampler.Mitchell));
+        image.Mutate(x => x.Resize(224, 224));
 
         // Flat array representing shape [1, 3, 224, 224] — batch, channels, height, width.
         // This layout is called NCHW and is what PyTorch-exported ResNet models expect.
@@ -42,7 +43,7 @@ public class HotdogClassifierService
         {
             for (int x = 0; x < 224; x++)
             {
-                var pixel = resized.GetPixel(x, y);
+                var pixel = image[x, y];
 
                 // Images store pixels interleaved (RGBRGBRGB...) but NCHW needs all of one
                 // channel together. The channel offset (0/1/2 * 224 * 224) separates them.
@@ -51,9 +52,9 @@ public class HotdogClassifierService
                 // Scales 0-255 → 0-1, then shifts to match the ImageNet distribution
                 // that ResNet was originally trained on. These constants are fixed for all
                 // ResNet models trained on ImageNet.
-                tensorData[0 * 224 * 224 + y * 224 + x] = (pixel.Red   / 255f - 0.485f) / 0.229f; // R
-                tensorData[1 * 224 * 224 + y * 224 + x] = (pixel.Green / 255f - 0.456f) / 0.224f; // G
-                tensorData[2 * 224 * 224 + y * 224 + x] = (pixel.Blue  / 255f - 0.406f) / 0.225f; // B
+                tensorData[0 * 224 * 224 + y * 224 + x] = (pixel.R / 255f - 0.485f) / 0.229f; // R
+                tensorData[1 * 224 * 224 + y * 224 + x] = (pixel.G / 255f - 0.456f) / 0.224f; // G
+                tensorData[2 * 224 * 224 + y * 224 + x] = (pixel.B / 255f - 0.406f) / 0.225f; // B
             }
         }
 
