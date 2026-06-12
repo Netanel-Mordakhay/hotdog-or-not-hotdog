@@ -1,0 +1,6 @@
+@HotdogApi_HostAddress = http://localhost:5245
+
+GET {{HotdogApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
